@@ -1,0 +1,389 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.concretepage</groupId>
+	<artifactId>spring-boot-demo</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>jar</packaging>
+	<name>spring-demo</name>
+	<description>Spring Boot Demo Project</description>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>2.1.4.RELEASE</version>
+	</parent>
+	<properties>
+		<java.version>1.8</java.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>mysql</groupId>
+			<artifactId>mysql-connector-java</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+
+
+
+
+
+
+package com.concretepage;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+@SpringBootApplication
+public class MyApplication {  
+    public static void main(String[] args) {
+	SpringApplication.run(MyApplication.class, args);
+    }       
+}
+
+
+
+
+
+package com.concretepage.controller;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+//import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import com.concretepage.entity.Article;
+import com.concretepage.service.IArticleService;
+
+@Controller
+@RequestMapping("IAG")
+@CrossOrigin(origins = {"http://localhost:4200"})
+public class ArticleController {
+	@Autowired
+	private IArticleService articleService;
+	@GetMapping("module")
+	public ResponseEntity<Article> getArticleById(@RequestParam("id") String id) {
+		Article article = articleService.getArticleById(Integer.parseInt(id));
+		return new ResponseEntity<Article>(article, HttpStatus.OK);
+	}
+	@GetMapping("modules")
+	public ResponseEntity<List<Article>> getAllArticles() {
+		List<Article> list = articleService.getAllArticles();
+		return new ResponseEntity<List<Article>>(list, HttpStatus.OK);
+	}
+	@PostMapping("module")
+	public ResponseEntity<Void> createArticle(@RequestBody Article article, UriComponentsBuilder builder) {
+		boolean flag = articleService.createArticle(article);
+		if (flag == false) {
+		     return new ResponseEntity<Void>(HttpStatus.CONFLICT);
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.setLocation(builder.path("/article?id={id}").buildAndExpand(article.getModuleId()).toUri());
+		return new ResponseEntity<Void>(headers, HttpStatus.CREATED);
+	}
+	@PutMapping("module")
+	public ResponseEntity<Article> updateArticle(@RequestBody Article article) {
+		articleService.updateArticle(article);
+		return new ResponseEntity<Article>(article, HttpStatus.OK);
+	}
+	@DeleteMapping("module")
+	public ResponseEntity<Void> deleteArticle(@RequestParam("id") String id) {
+		articleService.deleteArticle(Integer.parseInt(id));
+		return new ResponseEntity<Void>(HttpStatus.NO_CONTENT);
+	}	
+} 
+
+
+
+
+
+
+package com.concretepage.dao;
+import java.util.List;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import com.concretepage.entity.Article;
+@Transactional
+@Repository
+public class ArticleDAO implements IArticleDAO {
+	@PersistenceContext	
+	private EntityManager entityManager;	
+	@Override
+	public Article getArticleById(int ModuleId) {
+		return entityManager.find(Article.class, ModuleId);
+	}
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<Article> getAllArticles() {
+		String hql = "FROM Article as atcl ORDER BY atcl.Module_ID ASC";
+		return (List<Article>) entityManager.createQuery(hql).getResultList();
+	}	
+	@Override
+	public void createArticle(Article article) {
+		entityManager.persist(article);
+	}
+	@Override
+	public void updateArticle(Article article) {
+		Article artcl = getArticleById(article.getModuleId());
+		artcl.setModuleName(article.getModuleName());
+		artcl.setDateCreated(article.getDateCreated());
+		artcl.setDateModified(article.getDateModified());
+		entityManager.flush();
+	}
+	@Override
+	public void deleteArticle(int ModuleId) {
+		entityManager.remove(getArticleById(ModuleId));
+	}
+	@Override
+	public boolean articleExists(String name, String DateCreated, String DateModified) {
+		String hql = "FROM Article as atcl WHERE atcl.Module_Name = ? and atcl.DATE_CREATED = ? and atcl.DATE_MODIFIED = ?";
+		int count = entityManager.createQuery(hql).setParameter(1, name)
+		              .setParameter(2, DateCreated).setParameter(3, DateModified).getResultList().size();
+		return count > 0 ? true : false;
+	}
+} 
+
+
+
+
+package com.concretepage.dao;
+import java.util.List;
+import com.concretepage.entity.Article;
+public interface IArticleDAO {
+    List<Article> getAllArticles();
+    Article getArticleById(int ModuleId);
+    void createArticle(Article article);
+    void updateArticle(Article article);
+    void deleteArticle(int ModuleId);
+    boolean articleExists(String name, String DateCreated, String DateModified);
+}
+
+
+
+
+package com.concretepage.entity;
+import java.io.Serializable;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+@Entity
+@Table(name="IAG_Modules")
+public class Article implements Serializable { 
+	private static final long serialVersionUID = 1L;
+	@Id
+	@GeneratedValue(strategy=GenerationType.AUTO)
+	@Column(name="Module_ID")
+        private int ModuleId;  
+	@Column(name="Module_Name")
+        private String name;
+	@Column(name="DATE_CREATED")	
+	private String DateCreated;
+	@Column(name="DATE_MODIFIED")	
+	private String DateModified;
+	public int getModuleId() {
+		return ModuleId;
+	}
+	public void setModuleId(int ModuleId) {
+		this.ModuleId = ModuleId;
+	}
+	public String getModuleName() {
+		return name;
+	}
+	public void setModuleName(String name) {
+		this.name = name;
+	}
+	public String getDateCreated() {
+		return DateCreated;
+	}
+	public void setDateCreated(String DateCreated) {
+		this.DateCreated = DateCreated;
+	}
+	public String getDateModified() {
+		return DateModified;
+	}
+	public void setDateModified(String DateModified) {
+		this.DateModified = DateModified;
+	}
+} 
+
+
+
+
+package com.concretepage.service;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import com.concretepage.dao.IArticleDAO;
+import com.concretepage.entity.Article;
+@Service
+public class ArticleService implements IArticleService {
+	@Autowired
+	private IArticleDAO articleDAO;
+	@Override
+	public Article getArticleById(int articleId) {
+		Article obj = articleDAO.getArticleById(articleId);
+		return obj;
+	}	
+	@Override
+	public List<Article> getAllArticles(){
+		return articleDAO.getAllArticles();
+	}
+	@Override
+	public synchronized boolean createArticle(Article article){
+               if (articleDAO.articleExists(article.getModuleName(), article.getDateCreated(), article.getDateModified())) {
+    	           return false;
+               } else {
+    	           articleDAO.createArticle(article);
+    	           return true;
+               }
+	}
+	@Override
+	public void updateArticle(Article article) {
+		articleDAO.updateArticle(article);
+	}
+	@Override
+	public void deleteArticle(int articleId) {
+		articleDAO.deleteArticle(articleId);
+	}
+} 
+
+
+
+
+package com.concretepage.service;
+import java.util.List;
+import com.concretepage.entity.Article;
+public interface IArticleService {
+     List<Article> getAllArticles();
+     Article getArticleById(int articleId);
+     boolean createArticle(Article article);
+     void updateArticle(Article article);
+     void deleteArticle(int articleId);
+} 
+
+
+
+
+package com.concretepage.client;
+
+import java.net.URI;
+
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
+
+import com.concretepage.entity.Article;
+
+public class RestClientUtil {
+    public void getArticleByIdDemo() {
+    	HttpHeaders headers = new HttpHeaders();
+    	headers.setContentType(MediaType.APPLICATION_JSON);
+        RestTemplate restTemplate = new RestTemplate();
+	    String url = "http://localhost:8090/IAG/module/{id}";
+        HttpEntity<String> requestEntity = new HttpEntity<String>(headers);
+        ResponseEntity<Article> responseEntity = restTemplate.exchange(url, HttpMethod.GET, requestEntity, Article.class, 1);
+        Article article = responseEntity.getBody();
+        System.out.println("Id:"+article.getModuleId()+", Name:"+article.getModuleName()
+                 +", DateCreated:"+article.getDateCreated()+", DateModified:"+article.getDateModified());      
+    }
+	public void getAllArticlesDemo() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+        RestTemplate restTemplate = new RestTemplate();
+	    String url = "http://localhost:8090/IAG/modules";
+        HttpEntity<String> requestEntity = new HttpEntity<String>(headers);
+        ResponseEntity<Article[]> responseEntity = restTemplate.exchange(url, HttpMethod.GET, requestEntity, Article[].class);
+        Article[] articles = responseEntity.getBody();
+        for(Article article : articles) {
+              System.out.println("Id:"+article.getModuleId()+", Name:"+article.getModuleName()
+                      +", DateCreated: "+article.getDateCreated()+", DateModified: "+article.getDateCreated());
+        }
+    }
+    public void addArticleDemo() {
+    	HttpHeaders headers = new HttpHeaders();
+    	headers.setContentType(MediaType.APPLICATION_JSON);
+        RestTemplate restTemplate = new RestTemplate();
+	    String url = "http://localhost:8090/IAG/module";
+	    Article objArticle = new Article();
+	    objArticle.setModuleName("Spring REST Security using Hibernate");
+	    objArticle.setDateCreated("Spring");
+	    objArticle.setDateModified("Java");
+        HttpEntity<Article> requestEntity = new HttpEntity<Article>(objArticle, headers);
+        URI uri = restTemplate.postForLocation(url, requestEntity);
+        System.out.println(uri.getPath());    	
+    }
+    public void updateArticleDemo() {
+    	HttpHeaders headers = new HttpHeaders();
+    	headers.setContentType(MediaType.APPLICATION_JSON);
+        RestTemplate restTemplate = new RestTemplate();
+	    String url = "http://localhost:8090/IAG/module";
+	    Article objArticle = new Article();
+	    objArticle.setModuleId(1);
+	    objArticle.setModuleName("Update:Java Concurrency");
+	    objArticle.setDateCreated("Java");
+	    objArticle.setDateModified("Java");
+        HttpEntity<Article> requestEntity = new HttpEntity<Article>(objArticle, headers);
+        restTemplate.put(url, requestEntity);
+    }
+    public void deleteArticleDemo() {
+    	HttpHeaders headers = new HttpHeaders();
+    	headers.setContentType(MediaType.APPLICATION_JSON);
+        RestTemplate restTemplate = new RestTemplate();
+	    String url = "http://localhost:8090/IAG/module/{id}";
+        HttpEntity<Article> requestEntity = new HttpEntity<Article>(headers);
+        restTemplate.exchange(url, HttpMethod.DELETE, requestEntity, Void.class, 4);        
+    }
+    public static void main(String args[]) {
+    	RestClientUtil util = new RestClientUtil();
+        //util.getArticleByIdDemo();
+    	util.getAllArticlesDemo();
+    	//util.addArticleDemo();
+    	//util.updateArticleDemo();
+    	//util.deleteArticleDemo();
+    }    
+}
